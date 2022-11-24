@@ -57,6 +57,13 @@
             return encryptResult.toString();
         }
 
+        function decryptMessage(message, key, iv) {
+            var decryptResult = CryptoJS.AES.decrypt(message, key, {
+                iv: iv
+            });
+            return decryptResult.toString(CryptoJS.enc.Utf8);
+        }
+
         function setSessionWalletAddress(walletAddress) {
             localStorage.setItem('walletAddress', walletAddress);
         }
@@ -77,6 +84,26 @@
         function getSessionEncryptionKey() {
             return new Uint8Array(localStorage.getItem('encryptionKey').split(','));
         }
+
+        // CryptoJS.AES requires CryptoJS.enc.Hex.parse for custom encryption key
+        function getFormattedSessionEncryptionKey() {
+            var sessionEncryptionKey = getSessionEncryptionKey();
+            var key = CryptoJS.enc.Hex.parse(convertUint8ArrayToHexString(sessionEncryptionKey));
+            
+            // sanity check key
+            var calculatedKey = convertHexStringToUint8Array(CryptoJS.enc.Hex.stringify(key));
+            if (!checkUint8ArraysEqual(calculatedKey, sessionEncryptionKey)) {
+                alert('Encryption key error');
+            }
+
+            return key;
+        }
+
+        // https://stackoverflow.com/questions/38987784/how-to-convert-a-hexadecimal-string-to-uint8array-and-back-in-javascript
+        const convertHexStringToUint8Array = (hexString) =>
+            Uint8Array.from(hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
+        const convertUint8ArrayToHexString = (bytes) =>
+            bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
 
         function checkUint8ArraysEqual(array1, array2) {
             if (!(array1 instanceof Uint8Array) || !(array2 instanceof Uint8Array)) {
@@ -183,8 +210,11 @@
                 title: taskTitle
             });
             console.log('enc key');
-            console.log(CryptoJS.enc.Utf8.parse(getSessionEncryptionKey()));
-            var encryptedData = encryptMessage(data, CryptoJS.enc.Utf8.parse(getSessionEncryptionKey()), CryptoJS.enc.Hex.parse('0000000000000000'));
+            console.log(getSessionEncryptionKey());
+
+            var key = getFormattedSessionEncryptionKey();
+
+            var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse('0000000000000000'));
             $.post('/api/createtask', {
                 userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
                 encryptedData: encryptedData
@@ -219,6 +249,20 @@
 
             getTasks(function (err, result) {
                 //
+                for (var i = 0; i < result.length; i++) {
+                    var encryptedData = result[i].EncryptedData;
+                    console.log('encryptedData');
+                    console.log(encryptedData);
+
+                    var key = getFormattedSessionEncryptionKey();
+
+                    console.log('key!');
+                    console.log(key);
+
+                    var decryptedData = decryptMessage(encryptedData, key, CryptoJS.enc.Hex.parse('0000000000000000'));
+
+                    console.log(decryptedData);
+                }
             });
         });
 
