@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Todo Tasks</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"
+        integrity="sha512-aVKKRRi/Q/YV+4mjoKBsE4x3H+BkegoM/em46NNlCqNTmUYADjBbeNefNxYV7giUp0VxICtqdrbqU7iVaeZNXA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.1/dist/web3.min.js"
+        integrity="sha256-cdcyjItaOZqsMpqD2GtRBYwB4OBBT8RXfav8ecUYxtg=" crossorigin="anonymous"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/argon2-browser/1.18.0/argon2-bundled.min.js"
+        integrity="sha512-Alrh8vbmKDc5xiq7I/y8LTDwy9nw1nT9S/yR73HMMoWrpX4S1kizNPdWM896c/CDIGILNwAiaih627A94kRhYQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"
+        integrity="sha512-E8QSvWZ0eCLGk4km3hxSsNmGWbLtSCSUcewDQPQWZF6pEU8GlT8a5fF32wOl1i8ftdMhssTrF/OhyGWwonTcXA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"
+        integrity="sha512-wT7uPE7tOP6w4o28u1DN775jYjHQApdBnib5Pho4RB0Pgd9y7eSkAV1BTqQydupYDB9GBhTcQQzyNMPMV3cAew=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="/bundle.js"></script>
+</head>
+
+<body>
+
+    <script>
+        var sessionEncryptionKey = null;
+
+        // https://stackoverflow.com/questions/58325771/how-to-generate-random-hex-string-in-javascript
+        function generateRandomHexString(numBytes) {
+            const bytes = crypto.getRandomValues(new Uint8Array(numBytes));
+            const array = Array.from(bytes);
+            const hexPairs = array.map(b => b.toString(16).padStart(2, '0'));
+            return hexPairs.join('');
+        }
+
+        function encryptMessage(message, key, iv) {
+            var encryptResult = CryptoJS.AES.encrypt(message, key, {
+                iv: iv
+            });
+            return encryptResult.toString();
+        }
+
+        function setSessionWalletAddress(walletAddress) {
+            localStorage.setItem('walletAddress', walletAddress);
+        }
+
+        function getSessionWalletAddress() {
+            return localStorage.getItem('walletAddress');
+        }
+
+        function setSessionEncryptionKey(encryptionKey) {
+            localStorage.setItem('encryptionKey', encryptionKey.toString());
+
+            // test that encryption key is stored correctly
+            if (!checkUint8ArraysEqual(encryptionKey, getSessionEncryptionKey())) {
+                alert('Encryption key error');
+            }
+        }
+
+        function getSessionEncryptionKey() {
+            return new Uint8Array(localStorage.getItem('encryptionKey').split(','));
+        }
+
+        function checkUint8ArraysEqual(array1, array2) {
+            if (!(array1 instanceof Uint8Array) || !(array2 instanceof Uint8Array)) {
+                return false;
+            }
+            if (array1.length !== array2.length) {
+                return false;
+            }
+            for (var i = 0; i < array1.length; i++) {
+                if (array1[i] !== array2[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        async function connect() {
+            if (window.ethereum) {
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+                window.web3 = new Web3(window.ethereum);
+                const account = web3.eth.accounts;
+                //Get the current MetaMask selected/active wallet
+                const walletAddress = account.givenProvider.selectedAddress;
+                console.log(`Wallet: ${walletAddress}`);
+
+                setSessionWalletAddress(walletAddress);
+
+                // TODO: normalize wallet address (e.g. lowercase wallet address)
+
+                var signature = await web3.eth.personal.sign("Verify wallet ownership for TodoTasks.xyz\nNonce: 1234567", walletAddress);
+                console.log('Signature: ' + signature);
+
+                var encryptionSignature = await web3.eth.personal.sign("Generate encryption keys\nSalt: 1234567", walletAddress);
+                console.log('encryptionSignature: ' + encryptionSignature);
+
+                // TODO: get salt from database
+                var hashResult = await argon2.hash({ pass: encryptionSignature, salt: 'default_salt', hashLen: 32 });
+                var hashHex = hashResult.hashHex;
+                var hash = hashResult.hash;
+                console.log(hashResult);
+                console.log(hashHex);
+
+
+
+                const masterSecret = hash; // Uint8Array of arbitrary length
+                const hashMethod = 'SHA-256';
+                const length = 32; // derived key length
+                const info = ''; // information specified in rfc5869
+                const salt = new Uint8Array([1]); // Uint8Array of arbitrary length
+                // In the future, can use other salt values to derive keys for other purposes
+
+                var derivedKey = await HKDF.compute(masterSecret, hashMethod, length, info, salt);
+                console.log('derivedKey:');
+                console.log(derivedKey);
+
+
+                const encryptionKey = derivedKey.key;
+
+                console.log('encryptionKey');
+                console.log(encryptionKey);
+
+                setSessionEncryptionKey(encryptionKey);
+
+                console.log('encryptionKey to string');
+                console.log(encryptionKey.toString());
+
+                console.log('encryptionKey to string back to array');
+                console.log(new Uint8Array(encryptionKey.toString().split(',')));
+
+                console.log('getSessionEncryptionKey()');
+                console.log(getSessionEncryptionKey());
+
+                // TODO: iv should be stored in message and generated randomly
+                // IV size should be 16 bytes (128 bits)
+                var iv = CryptoJS.enc.Hex.parse(generateRandomHexString(16));
+                console.log('iv');
+                console.log(iv);
+
+                // Encrypt
+                var encryptResult = CryptoJS.AES.encrypt('my message', encryptionKey, {
+                    iv: iv
+                });
+                var ciphertext = encryptResult.toString();
+                console.log('encryptResult: ');
+                console.log(encryptResult);
+                console.log('ciphertext: ' + ciphertext);
+
+                var decryptedText = CryptoJS.AES.decrypt(ciphertext, encryptionKey, {
+                    iv: iv
+                }).toString(CryptoJS.enc.Utf8);
+
+                console.log('decryptedText: ' + decryptedText);
+            } else {
+                alert('No Ethereum wallet detected');
+                console.log("No wallet");
+            }
+        }
+
+        function addTask(taskTitle, callback) {
+            // TODO: remove console.log of encryption keys
+
+            // TODO: replace IV with value from database
+            var data = JSON.stringify({
+                title: taskTitle
+            });
+            console.log('enc key');
+            console.log(CryptoJS.enc.Utf8.parse(getSessionEncryptionKey()));
+            var encryptedData = encryptMessage(data, CryptoJS.enc.Utf8.parse(getSessionEncryptionKey()), CryptoJS.enc.Hex.parse('0000000000000000'));
+            $.post('/api/createtask', {
+                userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
+                encryptedData: encryptedData
+            }, function (result) {
+                console.log(result);
+
+                // TODO: return error message in callback?
+
+                callback(null, result);
+            });
+        }
+
+        function getTasks(callback) {
+            $.get('/api/gettasks', {
+                userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
+            }, function (result) {
+                console.log(result);
+
+                // TODO: return error message in callback?
+
+                callback(null, result);
+            });
+        }
+
+        $(document).ready(function () {
+            $('#save_task_button').click(function () {
+                var taskTitle = $('#task_title_input').val().trim();
+                addTask(taskTitle, function (err, result) {
+                    //
+                });
+            });
+
+            getTasks(function (err, result) {
+                //
+            });
+        });
+
+        // TODO: expand input height to show whole task title
+
+        // TODO: save task on enter
+
+        // TODO: add title, body
+
+        // TODO: when clicking outside the modal, show are you sure you want to discard changes text
+    </script>
+
+    <div class="container">
+
+        <h1 class="mt-3">
+            TodoTasks.xyz
+        </h1>
+
+        <p>
+            <button type="button" class="btn btn-primary" onclick="connect();">Connect Wallet</button>
+        </p>
+
+        <p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                Add Task
+            </button>
+        </p>
+
+        <!-- Modal -->
+        <div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Add Task</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input id="task_title_input" type="text" autocomplete="off" class="form-control" />
+                    </div>
+                    <div class="modal-footer">
+                        <button id="save_task_button" type="button" class="btn btn-primary">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p>
+            TodoTasks.xyz is a web3 end-to-end encrypted task manager. It can be used
+            for todos and quick notes.
+        </p>
+
+        <p>
+            To sign in, connect with your Ethereum wallet and sign two messages for
+            (1) verifying wallet ownership, and (2) generating encryption keys.
+        </p>
+
+        <p>
+            All tasks are end-to-end encrypted and stored in AWS.
+        </p>
+
+        <p>
+            TodoTasks.xyz is <a href="https://github.com/zoan37/web3-todo-tasks" target="_blank">open source on
+                GitHub</a>. Made by <a href="https://twitter.com/zoan37" target="_blank">zoan.eth</a>.
+        </p>
+
+    </div>
+
+</body>
+
+</html>
