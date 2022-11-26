@@ -386,12 +386,20 @@
             }, callback);
         }
 
+        function updateTaskOrder(taskId, order, callback) {
+            updateTask({
+                taskId: taskId,
+                order: order
+            }, callback);
+        }
+
         function updateTask(data, callback) {
             $.post('/api/updatetask', {
                 userId: getSessionWalletAddress(),
                 taskId: data.taskId,
                 isCompleted: data.isCompleted,
-                encryptedData: data.encryptedData
+                encryptedData: data.encryptedData,
+                order: data.order
             }, function (result) {
                 console.log(result);
 
@@ -434,8 +442,11 @@
             var cell2 = $('<td></td>').addClass('task_title_cell').text(data.title);
             cell2.attr('data-task-id', taskId);
 
+            var cell3 = $('<td></td>').text(task.Order);
+
             row.append(cell1);
             row.append(cell2);
+            row.append(cell3);
 
             row.addClass('task_row');
             row.attr('data-task-id', taskId);
@@ -527,7 +538,7 @@
                 const tasks = result.tasks;
 
                 tasks.sort(function (a, b) {
-                    return Number(b.CreationTime) - Number(a.CreationTime);
+                    return Number(b.Order) - Number(a.Order);
                 });
 
                 for (var i = 0; i < tasks.length; i++) {
@@ -547,7 +558,55 @@
                     console.log(task);
                 }
 
-                $('#open_tasks_tbody').sortable();
+                $('#open_tasks_tbody').sortable({
+                    update: function (event, ui) {
+                        // alert("updated");
+                        console.log(ui);
+                        console.log(ui.item);
+
+                        var prevTaskId = ui.item.prev().attr('data-task-id');
+                        var currTaskId = ui.item.attr('data-task-id');
+                        var nextTaskId = ui.item.next().attr('data-task-id');
+
+                        console.log('prevTaskId: ' + prevTaskId);
+                        console.log('currTaskId: ' + currTaskId);
+                        console.log('nextTaskId: ' + nextTaskId);
+                        
+                        const t = Number(taskMap[currTaskId].Order);
+                        var lower = null;
+                        var upper = null;
+
+                        var newOrder = null;
+
+                        if (prevTaskId) {
+                            upper = Number(taskMap[prevTaskId].Order);
+                        }
+                        if (nextTaskId) {
+                            lower = Number(taskMap[nextTaskId].Order);
+                        }
+
+                        if (upper == null && lower == null) {
+                            newOrder = t;
+                        } else if (upper != null && lower != null) {
+                            newOrder = upper / 2.0 + lower / 2.0;
+                        } else if (upper != null) {
+                            newOrder = upper - 100.0; // 100 for 100 milliseconds
+                        } else if (lower != null) {
+                            newOrder = lower + 100.0; // 100 for 100 milliseconds
+                        }
+
+                        console.log('t: ' + t);
+                        console.log('lower: ' + lower);
+                        console.log('upper: ' + upper);
+                        console.log('newOrder: ' + newOrder);
+
+                        taskMap[currTaskId].Order = newOrder;
+
+                        updateTaskOrder(currTaskId, newOrder, function (err, result) {
+
+                        });
+                    }
+                });
 
                 /*
                 for (var i = 0; i < result.length; i++) {

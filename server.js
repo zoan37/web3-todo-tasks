@@ -168,7 +168,8 @@ app.post('/api/updatetask', async (req, res) => {
         userId: req.body.userId.toLowerCase(),
         taskId: req.body.taskId,
         isCompleted: req.body.isCompleted,
-        encryptedData: req.body.encryptedData
+        encryptedData: req.body.encryptedData,
+        order: req.body.order
     }, function (err, result) {
         if (err) {
             console.log(err);
