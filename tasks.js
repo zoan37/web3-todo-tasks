@@ -79,9 +79,12 @@ var Tasks = function (config) {
 
     function updateTask(data, callback) {
         var isCompleted = data.isCompleted;
+        var encryptedData = data.encryptedData;
 
         if (isCompleted == 'true' || isCompleted == 'false') {
-            updateTaskState(data, callback)
+            updateTaskState(data, callback);
+        } else if (encryptedData) {
+            updateTaskEncryptedData(data, callback);
         }
     }
 
@@ -113,6 +116,52 @@ var Tasks = function (config) {
             ExpressionAttributeValues: {
                 ":c": {
                     BOOL: isCompleted == 'true'
+                },
+                ":t": {
+                    S: timestamp
+                }
+            }
+        };
+
+        console.log(params);
+
+        dynamoDB.updateItem(params, function (err, data) {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+
+            callback(null, data);
+        });
+    }
+
+    function updateTaskEncryptedData(data, callback) {
+        var timestamp = Date.now().toString();
+
+        var userId = data.userId;
+        var taskId = data.taskId;
+        var encryptedData = data.encryptedData;
+
+        console.log(data);
+
+        var params = {
+            TableName: "TodoTasks-Tasks",
+            Key: {
+                "UserId": {
+                    S: userId
+                },
+                "TaskId": {
+                    S: taskId
+                },
+            },
+            UpdateExpression: "set #D = :d, #LUT = :t",
+            ExpressionAttributeNames: {
+                "#D": "EncryptedData",
+                "#LUT": "LastUpdateTime"
+            },
+            ExpressionAttributeValues: {
+                ":d": {
+                    S: encryptedData
                 },
                 ":t": {
                     S: timestamp

@@ -42,11 +42,24 @@
 
     <style>
         .task_title_cell {
+            width: 100%;
             padding-left: 10px;
         }
 
         .task_strikethrough {
             text-decoration: line-through;
+        }
+
+        .task_row:hover {
+            background-color: rgb(246, 246, 246);
+        }
+
+        #open_tasks_table {
+            width: 100%;
+        }
+
+        #completed_tasks_table {
+            width: 100%;
         }
     </style>
 </head>
@@ -55,6 +68,8 @@
 
     <script>
         var sessionEncryptionKey = null;
+
+        var taskMap = {};
 
         // https://stackoverflow.com/questions/58325771/how-to-generate-random-hex-string-in-javascript
         function generateRandomHexString(numBytes) {
@@ -323,7 +338,6 @@
         function addTask(taskTitle, callback) {
             // TODO: remove console.log of encryption keys
 
-            // TODO: replace IV with value from database
             var data = JSON.stringify({
                 title: taskTitle
             });
@@ -347,6 +361,24 @@
             });
         }
 
+        function updateTaskTitle(taskId, taskTitle, callback) {
+            var data = JSON.stringify({
+                title: taskTitle
+            });
+
+            var key = getFormattedSessionEncryptionKey();
+
+            console.log(taskId);
+            console.log(taskMap[taskId]);
+            var iv = taskMap[taskId].EncryptionIV;
+            var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse(iv));
+
+            updateTask({
+                taskId: taskId,
+                encryptedData: encryptedData
+            }, callback);
+        }
+
         function updateTaskCompletion(taskId, isCompleted, callback) {
             updateTask({
                 taskId: taskId,
@@ -359,6 +391,7 @@
                 userId: getSessionWalletAddress(),
                 taskId: data.taskId,
                 isCompleted: data.isCompleted,
+                encryptedData: data.encryptedData
             }, function (result) {
                 console.log(result);
 
@@ -399,6 +432,7 @@
 
             var cell1 = $('<td></td>').append(checkbox);
             var cell2 = $('<td></td>').addClass('task_title_cell').text(data.title);
+            cell2.attr('data-task-id', taskId);
 
             row.append(cell1);
             row.append(cell2);
@@ -438,11 +472,20 @@
                 });
             });
 
+            $(document).on('click', '.task_title_cell', function () {
+                $('#edit_task_title_input').val($(this).text());
+                var taskId = $(this).attr('data-task-id');
+                $('#edit_task_title_input').attr('data-task-id', taskId);
+                $("#editTaskModal").modal('show');
+            });
+
             $('#save_task_button').click(function () {
                 var taskTitle = $('#task_title_input').val().trim();
                 addTask(taskTitle, function (err, result) {
                     // TODO: handle err
                     var row = createTaskRow(result.task, false);
+
+                    taskMap[result.task.TaskId] = result.task;
 
                     $('#open_tasks_tbody').prepend(row);
                 });
@@ -454,12 +497,30 @@
                 }
             });
 
+            $('#edit_save_task_button').click(function () {
+                var taskId = $('#edit_task_title_input').attr('data-task-id');
+                var taskTitle = $('#edit_task_title_input').val().trim();
+                updateTaskTitle(taskId, taskTitle, function (err, result) {
+                    $('.task_title_cell[data-task-id="' + taskId + '"]').text(taskTitle);
+                });
+            });
+
+            $('#edit_task_title_input').keypress(function (e) {
+                if (e.which == 13) {
+                    $('#edit_save_task_button').click();
+                }
+            });
+
             $('#addTaskModal').on('show.bs.modal', function (e) {
                 $('#task_title_input').val('');
             });
 
             $('#addTaskModal').on('shown.bs.modal', function (e) {
                 $('#task_title_input').focus();
+            });
+
+            $('#editTaskModal').on('shown.bs.modal', function (e) {
+                $('#edit_task_title_input').focus();
             });
 
             getTasks(function (err, result) {
@@ -480,6 +541,8 @@
                     } else {
                         $('#open_tasks_tbody').append(row);
                     }
+
+                    taskMap[task.TaskId] = task;
 
                     console.log(task);
                 }
@@ -543,6 +606,25 @@
                     </div>
                     <div class="modal-footer">
                         <button id="save_task_button" type="button" class="btn btn-primary"
+                            data-bs-dismiss="modal">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal -->
+        <div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Edit Task</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input id="edit_task_title_input" type="text" autocomplete="off" class="form-control" />
+                    </div>
+                    <div class="modal-footer">
+                        <button id="edit_save_task_button" type="button" class="btn btn-primary"
                             data-bs-dismiss="modal">Save</button>
                     </div>
                 </div>
