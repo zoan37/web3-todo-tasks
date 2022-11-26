@@ -149,6 +149,7 @@ app.post('/api/createtask', async (req, res) => {
 
     tasks.createTask({
         userId: req.body.userId.toLowerCase(),
+        encryptionIV: req.body.encryptionIV,
         encryptedData: req.body.encryptedData
     }, function (err, result) {
         if (err) {
@@ -178,7 +179,9 @@ app.get('/api/gettasks', async (req, res) => {
         }
 
         console.log(result);
-        res.send(result);
+        res.send({
+            tasks: result
+        });
     });
 });
 

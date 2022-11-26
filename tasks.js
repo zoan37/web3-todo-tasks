@@ -29,6 +29,7 @@ var Tasks = function (config) {
 
         var userId = data.userId;
         var taskId = uuid.v4();
+        var encryptionIV = data.encryptionIV;
         var encryptedData = data.encryptedData;
 
         var params = {
@@ -38,6 +39,9 @@ var Tasks = function (config) {
                 },
                 "TaskId": {
                     S: taskId
+                },
+                "EncryptionIV": {
+                    S: encryptionIV
                 },
                 "EncryptedData": {
                     S: encryptedData
@@ -64,7 +68,9 @@ var Tasks = function (config) {
 
             console.log("Success", data);
 
-            callback(null, data);
+            callback(null, {
+                task: AWS.DynamoDB.Converter.unmarshall(params.Item)
+            });
         });
     }
 
