@@ -46,6 +46,9 @@ var Tasks = function (config) {
                 "EncryptedData": {
                     S: encryptedData
                 },
+                "IsCompleted": {
+                    BOOL: false
+                },
                 "Order": {
                     N: timestamp
                 },
@@ -71,6 +74,61 @@ var Tasks = function (config) {
             callback(null, {
                 task: AWS.DynamoDB.Converter.unmarshall(params.Item)
             });
+        });
+    }
+
+    function updateTask(data, callback) {
+        var isCompleted = data.isCompleted;
+
+        if (isCompleted == 'true' || isCompleted == 'false') {
+            updateTaskState(data, callback)
+        }
+    }
+
+    function updateTaskState(data, callback) {
+        var timestamp = Date.now().toString();
+
+        var userId = data.userId;
+        var taskId = data.taskId;
+        var isCompleted = data.isCompleted;
+
+        console.log('updateTaskState data');
+        console.log(data);
+
+        var params = {
+            TableName: "TodoTasks-Tasks",
+            Key: {
+                "UserId": {
+                    S: userId
+                },
+                "TaskId": {
+                    S: taskId
+                },
+            },
+            UpdateExpression: "set #C = :c, #LUT = :t",
+            ExpressionAttributeNames: {
+                "#C": "IsCompleted",
+                "#LUT": "LastUpdateTime"
+            },
+            ExpressionAttributeValues: {
+                ":c": {
+                    BOOL: isCompleted == 'true'
+                },
+                ":t": {
+                    S: timestamp
+                }
+            }
+        };
+
+        console.log(params);
+
+        dynamoDB.updateItem(params, function (err, data) {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+
+            callback(null, data);
         });
     }
 
@@ -112,7 +170,8 @@ var Tasks = function (config) {
 
     return {
         createTask: createTask,
-        getTasks: getTasks
+        getTasks: getTasks,
+        updateTask: updateTask
     }
 };
 

@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Todo Tasks</title>
+    <title>TodoTasks.xyz</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
@@ -39,6 +39,16 @@
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <script src="/bundle.js"></script>
+
+    <style>
+        .task_title_cell {
+            padding-left: 10px;
+        }
+
+        .task_strikethrough {
+            text-decoration: line-through;
+        }
+    </style>
 </head>
 
 <body>
@@ -337,6 +347,25 @@
             });
         }
 
+        function updateTaskCompletion(taskId, isCompleted, callback) {
+            updateTask({
+                taskId: taskId,
+                isCompleted: isCompleted
+            }, callback);
+        }
+
+        function updateTask(data, callback) {
+            $.post('/api/updatetask', {
+                userId: getSessionWalletAddress(),
+                taskId: data.taskId,
+                isCompleted: data.isCompleted,
+            }, function (result) {
+                console.log(result);
+
+                callback(null, result);
+            });
+        }
+
         function getTasks(callback) {
             $.get('/api/gettasks', {
                 userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
@@ -349,12 +378,13 @@
             });
         }
 
-        function createTaskRow(task) {
+        function createTaskRow(task, isCompleted) {
             var row = $('<tr></tr>');
 
             var key = getFormattedSessionEncryptionKey();
             var iv = task.EncryptionIV;
             var encryptedData = task.EncryptedData;
+            var taskId = task.TaskId;
 
             var decryptedData = decryptMessage(encryptedData, key, CryptoJS.enc.Hex.parse(iv));
 
@@ -362,22 +392,70 @@
 
             var data = JSON.parse(decryptedData);
 
-            var cell1 = $('<td></td>').text(data.title);
+            var checkbox = $('<input class="form-check-input" type="checkbox" value=""/>')
+                .prop('checked', isCompleted)
+                .addClass('task_checkbox')
+                .attr('data-task-id', taskId);
+
+            var cell1 = $('<td></td>').append(checkbox);
+            var cell2 = $('<td></td>').addClass('task_title_cell').text(data.title);
 
             row.append(cell1);
+            row.append(cell2);
+
+            row.addClass('task_row');
+            row.attr('data-task-id', taskId);
+
+            if (isCompleted) {
+                row.find('.task_title_cell').addClass('task_strikethrough');
+            }
 
             return row;
         }
 
         $(document).ready(function () {
+            $(document).on('change', '.task_checkbox', function () {
+                const taskId = $(this).attr("data-task-id");
+                const taskIsChecked = this.checked;
+                updateTaskCompletion(taskId, taskIsChecked, function (err, result) {
+                    console.log(result);
+
+                    if (taskIsChecked) {
+                        var row = $('.task_row[data-task-id="' + taskId + '"]');
+                        row.remove();
+
+                        row.find('.task_title_cell').addClass('task_strikethrough');
+
+                        $('#completed_tasks_tbody').prepend(row);
+                    } else {
+                        var row = $('.task_row[data-task-id="' + taskId + '"]');
+                        row.remove();
+
+                        row.find('.task_title_cell').removeClass('task_strikethrough');
+
+                        $('#open_tasks_tbody').prepend(row);
+                    }
+                });
+            });
+
             $('#save_task_button').click(function () {
                 var taskTitle = $('#task_title_input').val().trim();
                 addTask(taskTitle, function (err, result) {
                     // TODO: handle err
-                    var row = createTaskRow(result.task);
+                    var row = createTaskRow(result.task, false);
 
                     $('#open_tasks_tbody').prepend(row);
                 });
+            });
+
+            $('#task_title_input').keypress(function (e) {
+                if (e.which == 13) {
+                    $('#save_task_button').click();
+                }
+            });
+
+            $('#addTaskModal').on('show.bs.modal', function (e) {
+                $('#task_title_input').val('');
             });
 
             $('#addTaskModal').on('shown.bs.modal', function (e) {
@@ -394,9 +472,14 @@
                 for (var i = 0; i < tasks.length; i++) {
                     var task = tasks[i];
 
-                    var row = createTaskRow(task);
+                    var isCompleted = task.IsCompleted;
+                    var row = createTaskRow(task, isCompleted);
 
-                    $('#open_tasks_tbody').append(row);
+                    if (isCompleted) {
+                        $('#completed_tasks_tbody').append(row);
+                    } else {
+                        $('#open_tasks_tbody').append(row);
+                    }
 
                     console.log(task);
                 }
@@ -433,9 +516,9 @@
 
     <div class="container">
 
-        <h1 class="mt-3">
+        <h2 class="mt-3">
             TodoTasks.xyz
-        </h1>
+        </h2>
 
         <p>
             <button type="button" class="btn btn-primary" onclick="connect();">Connect Wallet</button>
@@ -459,7 +542,8 @@
                         <input id="task_title_input" type="text" autocomplete="off" class="form-control" />
                     </div>
                     <div class="modal-footer">
-                        <button id="save_task_button" type="button" class="btn btn-primary" data-bs-dismiss="modal">Save</button>
+                        <button id="save_task_button" type="button" class="btn btn-primary"
+                            data-bs-dismiss="modal">Save</button>
                     </div>
                 </div>
             </div>
@@ -471,19 +555,23 @@
             </table>
 
             <div class="accordion accordion-flush" id="accordionFlushExample"
-                style="border-top: 1px solid rgb(216, 216, 216);">
+                style="border-top: 1px solid rgb(216, 216, 216); margin-top: 15px;">
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="flush-headingOne">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne">
+                            data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne"
+                            style="">
                             Completed Tasks
                         </button>
                     </h2>
                     <div id="flush-collapseOne" class="accordion-collapse collapse" aria-labelledby="flush-headingOne"
                         data-bs-parent="#accordionFlushExample">
-                        <div class="accordion-body">Placeholder content for this accordion, which is intended to
-                            demonstrate the <code>.accordion-flush</code> class. This is the first item's accordion
-                            body.</div>
+
+                        <table id="completed_tasks_table">
+                            <tbody id="completed_tasks_tbody"></tbody>
+                        </table>
+
+                        <div class="accordion-body"></div>
                     </div>
                 </div>
             </div>

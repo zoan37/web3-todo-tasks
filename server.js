@@ -46,12 +46,6 @@ function verifyRequest(req) {
     
         var decoded = jwt.verify(sessionToken, process.env.SESSION_TOKEN_SECRET_KEY);
 
-        console.log('req');
-        console.log(req);
-
-        console.log('decoded');
-        console.log(decoded);
-
         if (decoded.userId.toLowerCase() != userId.toLowerCase()) {
             throw "UserId mismatch in session token";
         }
@@ -151,6 +145,29 @@ app.post('/api/createtask', async (req, res) => {
         userId: req.body.userId.toLowerCase(),
         encryptionIV: req.body.encryptionIV,
         encryptedData: req.body.encryptedData
+    }, function (err, result) {
+        if (err) {
+            console.log(err);
+            return;
+        }
+
+        console.log(result);
+        res.send(result);
+    });
+});
+
+app.post('/api/updatetask', async (req, res) => {
+    console.log(req.body);
+
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
+
+    tasks.updateTask({
+        userId: req.body.userId.toLowerCase(),
+        taskId: req.body.taskId,
+        isCompleted: req.body.isCompleted
     }, function (err, result) {
         if (err) {
             console.log(err);
