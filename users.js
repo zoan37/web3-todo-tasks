@@ -104,6 +104,23 @@ var Tasks = function (config) {
         });
     }
 
+    function getUserNonce(data, callback) {
+        getUser(data, function (err, data) {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+
+            var result = {};
+
+            if (data.AuthenticationNonce) {
+                result.AuthenticationNonce = data.AuthenticationNonce;
+            }
+
+            callback(null, result);
+        });
+    }
+
     function authenticateUser(data, callback) {
         var userId = data.userId;
         var signature = data.signature;
@@ -143,6 +160,7 @@ var Tasks = function (config) {
     return {
         createUser: createUser,
         getUser: getUser,
+        getUserNonce: getUserNonce,
         authenticateUser: authenticateUser
     }
 };

@@ -11,6 +11,8 @@ const port = 3000
 
 require('dotenv').config();
 
+const jwt = require('jsonwebtoken');
+
 const AWS = require("aws-sdk");
 const dynamoDB = new AWS.DynamoDB();
 
@@ -31,10 +33,44 @@ app.get('/', (req, res) => {
     res.send('Hello World!')
 })
 
+function verifyRequest(req) {
+    try {
+        var userId; 
+        if (req.method == 'GET') {
+            userId = req.query.userId;
+        } else {
+            userId = req.body.userId;
+        }
+        
+        var sessionToken = req.cookies.sessionToken;
+    
+        var decoded = jwt.verify(sessionToken, process.env.SESSION_TOKEN_SECRET_KEY);
+
+        console.log('req');
+        console.log(req);
+
+        console.log('decoded');
+        console.log(decoded);
+
+        if (decoded.userId.toLowerCase() != userId.toLowerCase()) {
+            throw "UserId mismatch in session token";
+        }
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // TODO: remove logging of user data on server
 
 app.post('/api/createuser', async (req, res) => {
     console.log(req.body);
+
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
 
     users.createUser({
         userId: req.body.userId.toLowerCase()
@@ -52,7 +88,28 @@ app.post('/api/createuser', async (req, res) => {
 app.get('/api/getuser', async (req, res) => {
     console.log(req.query);
 
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
+
     users.getUser({
+        userId: req.query.userId.toLowerCase()
+    }, function (err, result) {
+        if (err) {
+            console.log(err);
+            return;
+        }
+
+        console.log(result);
+        res.send(result);
+    });
+});
+
+app.get('/api/getusernonce', async (req, res) => {
+    console.log(req.query);
+
+    users.getUserNonce({
         userId: req.query.userId.toLowerCase()
     }, function (err, result) {
         if (err) {
@@ -85,6 +142,11 @@ app.post('/api/authenticateuser', async (req, res) => {
 app.post('/api/createtask', async (req, res) => {
     console.log(req.body);
 
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
+
     tasks.createTask({
         userId: req.body.userId.toLowerCase(),
         encryptedData: req.body.encryptedData
@@ -101,6 +163,11 @@ app.post('/api/createtask', async (req, res) => {
 
 app.get('/api/gettasks', async (req, res) => {
     console.log(req.query);
+
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
 
     tasks.getTasks({
         userId: req.query.userId.toLowerCase()

@@ -64,6 +64,10 @@
             return decryptResult.toString(CryptoJS.enc.Utf8);
         }
 
+        function setSessionToken(sessionToken) {
+            Cookies.set('sessionToken', sessionToken);
+        }
+
         function setSessionWalletAddress(walletAddress) {
             localStorage.setItem('walletAddress', walletAddress);
         }
@@ -77,7 +81,7 @@
 
             // test that encryption key is stored correctly
             if (!checkUint8ArraysEqual(encryptionKey, getSessionEncryptionKey())) {
-                alert('Encryption key error');
+                throw 'Encryption key error';
             }
         }
 
@@ -93,7 +97,7 @@
             // sanity check key
             var calculatedKey = convertHexStringToUint8Array(CryptoJS.enc.Hex.stringify(key));
             if (!checkUint8ArraysEqual(calculatedKey, sessionEncryptionKey)) {
-                alert('Encryption key error');
+                throw 'Encryption key error';
             }
 
             return key;
@@ -138,19 +142,19 @@
 
                 // TODO: normalize wallet address (e.g. lowercase wallet address)
 
-                var getUserResult = await getUser(walletAddress);
-                console.log('getUserResult:');
-                console.log(getUserResult);
+                var getUserNonceResult = await getUserNonce(walletAddress);
+                console.log('getUserNonceResult:');
+                console.log(getUserNonceResult);
 
-                if (!getUserResult.UserId) {
+                if (!getUserNonceResult.AuthenticationNonce) {
                     var createUserResult = await createUser(walletAddress);
                     console.log('createUserResult:');
                     console.log(createUserResult);
 
-                    getUserResult = await getUser(walletAddress);
+                    getUserNonceResult = await getUserNonce(walletAddress);
                 }
 
-                const authenticationNonce = getUserResult.AuthenticationNonce;
+                const authenticationNonce = getUserNonceResult.AuthenticationNonce;
 
                 const signature = await web3.eth.personal.sign("Verify wallet ownership for TodoTasks.xyz\nNonce: " + authenticationNonce, walletAddress);
                 console.log('Signature: ' + signature);
@@ -159,16 +163,28 @@
                 console.log('authenticateUserResult:');
                 console.log(authenticateUserResult);
 
+                const sessionToken = authenticateUserResult.sessionToken;
+
+                setSessionToken(sessionToken);
+
                 // TODO: store signature in cookie
 
+                var getUserResult = await getUser(walletAddress);
+                console.log('getUserResult:');
+                console.log(getUserResult);
+
                 const encryptionSalt = getUserResult.EncryptionSalt;
+
+                if (!encryptionSalt) {
+                    throw 'Encryption salt not found';
+                }
 
                 var encryptionSignature = await web3.eth.personal.sign("Generate encryption keys\nSalt: " + encryptionSalt, walletAddress);
                 console.log('encryptionSignature: ' + encryptionSignature);
 
                 // sanity check encryption signature length
                 if (encryptionSignature.length < 10) {
-                    alert('Encryption signature error');
+                    throw 'Encryption signature error';
                 }
 
                 // TODO: get salt from database
@@ -180,7 +196,7 @@
 
                 // sanity check encryption hash
                 if (!(hash instanceof Uint8Array) || hash.length != 32) {
-                    alert('Encryption key error');
+                    throw 'Encryption key error';
                 }
 
                 const masterSecret = hash; // Uint8Array of arbitrary length
@@ -198,7 +214,7 @@
 
                 // sanity check encryption key
                 if (!(encryptionKey instanceof Uint8Array) || encryptionKey.length != 32) {
-                    alert('Encryption key error');
+                    throw 'Encryption key error';
                 }
 
                 console.log('encryptionKey');
@@ -256,6 +272,18 @@
         async function getUser(userId) {
             return new Promise(resolve => {
                 $.get('/api/getuser', {
+                    userId: userId
+                }, function (result) {
+                    console.log(result);
+
+                    resolve(result);
+                });
+            });
+        }
+
+        async function getUserNonce(userId) {
+            return new Promise(resolve => {
+                $.get('/api/getusernonce', {
                     userId: userId
                 }, function (result) {
                     console.log(result);
