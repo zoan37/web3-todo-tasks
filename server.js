@@ -31,6 +31,10 @@ const tasks = new Tasks({
     dynamoDB: dynamoDB
 });
 
+app.get('/bundle.js', (req, res) => {
+    res.sendFile('bundle.js', { root: __dirname })
+});
+
 function verifyRequest(req) {
     try {
         var userId;

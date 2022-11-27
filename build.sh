@@ -1,1 +1,1 @@
-browserify main.js -p esmify > public/bundle.js
+browserify main.js -p esmify > bundle.js
