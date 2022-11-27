@@ -54,6 +54,12 @@
             background-color: rgb(246, 246, 246);
         }
 
+        .task_row td {
+            vertical-align: middle;
+            padding-top: 3px;
+            padding-bottom: 3px;
+        }
+
         #open_tasks_table {
             width: 100%;
         }
@@ -451,6 +457,17 @@
             });
         }
 
+        function displayCompletedTasksCount() {
+            var completedTasksCount = 0;
+            for (var taskId in taskMap) {
+                if (taskMap[taskId].IsCompleted) {
+                    completedTasksCount++;
+                }
+            }
+
+            $('#completed_tasks_count').text(completedTasksCount);
+        }
+
         function getTasks(callback) {
             $.get('/api/gettasks', {
                 userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
@@ -529,6 +546,10 @@
                     updateTaskOrderForRow(row, function (err, result) {
 
                     });
+
+                    taskMap[taskId].IsCompleted = taskIsChecked;
+
+                    displayCompletedTasksCount();
                 });
             });
 
@@ -606,6 +627,8 @@
 
                     console.log(task);
                 }
+
+                displayCompletedTasksCount();
 
                 $('#open_tasks_tbody').sortable({
                     update: function (event, ui) {
@@ -713,7 +736,7 @@
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                             data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne"
                             style="">
-                            Completed Tasks
+                            Completed Tasks (<span id="completed_tasks_count"></span>)
                         </button>
                     </h2>
                     <div id="flush-collapseOne" class="accordion-collapse collapse" aria-labelledby="flush-headingOne"
