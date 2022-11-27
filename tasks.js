@@ -72,8 +72,6 @@ var Tasks = function (config) {
                 return;
             }
 
-            console.log("Success", data);
-
             callback(null, {
                 task: AWS.DynamoDB.Converter.unmarshall(params.Item)
             });
@@ -101,9 +99,6 @@ var Tasks = function (config) {
         var taskId = data.taskId;
         var isCompleted = data.isCompleted;
 
-        console.log('updateTaskState data');
-        console.log(data);
-
         var params = {
             TableName: "TodoTasks-Tasks",
             Key: {
@@ -129,8 +124,6 @@ var Tasks = function (config) {
             }
         };
 
-        console.log(params);
-
         dynamoDB.updateItem(params, function (err, data) {
             if (err) {
                 callback(err, null);
@@ -147,8 +140,6 @@ var Tasks = function (config) {
         var userId = data.userId;
         var taskId = data.taskId;
         var encryptedData = data.encryptedData;
-
-        console.log(data);
 
         var params = {
             TableName: "TodoTasks-Tasks",
@@ -175,8 +166,6 @@ var Tasks = function (config) {
             }
         };
 
-        console.log(params);
-
         dynamoDB.updateItem(params, function (err, data) {
             if (err) {
                 callback(err, null);
@@ -193,8 +182,6 @@ var Tasks = function (config) {
         var userId = data.userId;
         var taskId = data.taskId;
         var order = data.order;
-
-        console.log(data);
 
         var params = {
             TableName: "TodoTasks-Tasks",
@@ -220,8 +207,6 @@ var Tasks = function (config) {
                 }
             }
         };
-
-        console.log(params);
 
         dynamoDB.updateItem(params, function (err, data) {
             if (err) {

@@ -273,8 +273,6 @@
                 $.post('/api/createuser', {
                     userId: userId
                 }, function (result) {
-                    console.log(result);
-
                     resolve(result);
                 });
             });
@@ -285,8 +283,6 @@
                 $.get('/api/getuser', {
                     userId: userId
                 }, function (result) {
-                    console.log(result);
-
                     resolve(result);
                 });
             });
@@ -297,8 +293,6 @@
                 $.get('/api/getusernonce', {
                     userId: userId
                 }, function (result) {
-                    console.log(result);
-
                     resolve(result);
                 });
             });
@@ -310,8 +304,6 @@
                     userId: userId,
                     signature: signature
                 }, function (result) {
-                    console.log(result);
-
                     resolve(result);
                 });
             });
@@ -323,8 +315,6 @@
             var data = JSON.stringify({
                 title: taskTitle
             });
-            console.log('enc key');
-            console.log(getSessionEncryptionKey());
 
             var key = getFormattedSessionEncryptionKey();
             var iv = generateRandomHexString(16);
@@ -334,11 +324,6 @@
                 encryptionIV: iv,
                 encryptedData: encryptedData
             }, function (result) {
-                console.log('addTask:');
-                console.log(result);
-
-                // TODO: return error message in callback?
-
                 callback(null, result);
             });
         }
@@ -349,9 +334,6 @@
             });
 
             var key = getFormattedSessionEncryptionKey();
-
-            console.log(taskId);
-            console.log(taskMap[taskId]);
             var iv = taskMap[taskId].EncryptionIV;
             var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse(iv));
 
@@ -372,10 +354,6 @@
             var prevTaskId = row.prev().attr('data-task-id');
             var currTaskId = row.attr('data-task-id');
             var nextTaskId = row.next().attr('data-task-id');
-
-            console.log('prevTaskId: ' + prevTaskId);
-            console.log('currTaskId: ' + currTaskId);
-            console.log('nextTaskId: ' + nextTaskId);
 
             const t = Number(taskMap[currTaskId].Order);
             var lower = null;
@@ -400,11 +378,6 @@
                 newOrder = lower + 100.0; // 100 for 100 milliseconds
             }
 
-            console.log('t: ' + t);
-            console.log('lower: ' + lower);
-            console.log('upper: ' + upper);
-            console.log('newOrder: ' + newOrder);
-
             taskMap[currTaskId].Order = newOrder;
 
             updateTaskOrder(currTaskId, newOrder, function (err, result) {
@@ -427,8 +400,6 @@
                 encryptedData: data.encryptedData,
                 order: data.order
             }, function (result) {
-                console.log(result);
-
                 callback(null, result);
             });
         }
@@ -438,8 +409,6 @@
                 userId: getSessionWalletAddress(),
                 taskId: taskId
             }, function (result) {
-                console.log(result);
-
                 callback(null, result);
             });
         }
@@ -459,10 +428,6 @@
             $.get('/api/gettasks', {
                 userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
             }, function (result) {
-                console.log(result);
-
-                // TODO: return error message in callback?
-
                 callback(null, result);
             });
         }
@@ -476,8 +441,6 @@
             var taskId = task.TaskId;
 
             var decryptedData = decryptMessage(encryptedData, key, CryptoJS.enc.Hex.parse(iv));
-
-            console.log(decryptedData);
 
             var data = JSON.parse(decryptedData);
 
@@ -527,8 +490,6 @@
                 const taskId = $(this).attr("data-task-id");
                 const taskIsChecked = this.checked;
                 updateTaskCompletion(taskId, taskIsChecked, function (err, result) {
-                    console.log(result);
-
                     var row;
                     if (taskIsChecked) {
                         row = $('.task_row[data-task-id="' + taskId + '"]');
@@ -647,18 +608,12 @@
                         }
 
                         taskMap[task.TaskId] = task;
-
-                        console.log(task);
                     }
 
                     refreshCompletedTasksCount();
 
                     $('#open_tasks_tbody').sortable({
                         update: function (event, ui) {
-                            // alert("updated");
-                            console.log(ui);
-                            console.log(ui.item);
-
                             updateTaskOrderForRow(ui.item, function (err, result) {
 
                             });

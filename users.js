@@ -70,8 +70,6 @@ var Tasks = function (config) {
                 return;
             }
 
-            console.log("Success", data);
-
             callback(null, data);
         });
     }
@@ -97,8 +95,6 @@ var Tasks = function (config) {
             }
 
             var result = AWS.DynamoDB.Converter.unmarshall(data.Item);
-
-            console.log(result);
 
             callback(null, result);
         });

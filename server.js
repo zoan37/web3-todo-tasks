@@ -56,11 +56,7 @@ function verifyRequest(req) {
     }
 }
 
-// TODO: remove logging of user data on server
-
 app.post('/api/createuser', async (req, res) => {
-    console.log(req.body);
-
     users.createUser({
         userId: req.body.userId.toLowerCase()
     }, function (err, result) {
@@ -69,14 +65,11 @@ app.post('/api/createuser', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.get('/api/getuser', async (req, res) => {
-    console.log(req.query);
-
     if (!verifyRequest(req)) {
         res.status(401).send("Unauthorized");
         return;
@@ -90,14 +83,11 @@ app.get('/api/getuser', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.get('/api/getusernonce', async (req, res) => {
-    console.log(req.query);
-
     users.getUserNonce({
         userId: req.query.userId.toLowerCase()
     }, function (err, result) {
@@ -106,14 +96,11 @@ app.get('/api/getusernonce', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.post('/api/authenticateuser', async (req, res) => {
-    console.log(req.body);
-
     users.authenticateUser({
         userId: req.body.userId.toLowerCase(),
         signature: req.body.signature
@@ -123,14 +110,11 @@ app.post('/api/authenticateuser', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.post('/api/createtask', async (req, res) => {
-    console.log(req.body);
-
     if (!verifyRequest(req)) {
         res.status(401).send("Unauthorized");
         return;
@@ -146,14 +130,11 @@ app.post('/api/createtask', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.post('/api/updatetask', async (req, res) => {
-    console.log(req.body);
-
     if (!verifyRequest(req)) {
         res.status(401).send("Unauthorized");
         return;
@@ -171,14 +152,11 @@ app.post('/api/updatetask', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.post('/api/deletetask', async (req, res) => {
-    console.log(req.body);
-
     if (!verifyRequest(req)) {
         res.status(401).send("Unauthorized");
         return;
@@ -193,14 +171,11 @@ app.post('/api/deletetask', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send(result);
     });
 });
 
 app.get('/api/gettasks', async (req, res) => {
-    console.log(req.query);
-
     if (!verifyRequest(req)) {
         res.status(401).send("Unauthorized");
         return;
@@ -214,7 +189,6 @@ app.get('/api/gettasks', async (req, res) => {
             return;
         }
 
-        console.log(result);
         res.send({
             tasks: result
         });
