@@ -3,7 +3,7 @@ const uuid = require('uuid');
 var Tasks = function (config) {
 
     const MAX_TASK_DATA_LENGTH = 10000;
-    const MAX_IV_LENGTH = 16;
+    const MAX_IV_LENGTH = 32;
     const MAX_USER_ID_LENGTH = 100;
 
     const AWS = config.AWS;
