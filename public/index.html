@@ -144,8 +144,13 @@
             return new Uint8Array(key.split(','));
         }
 
+        var cachedFormattedKey = null;
         // CryptoJS.AES requires CryptoJS.enc.Hex.parse for custom encryption key
         function getFormattedSessionEncryptionKey() {
+            if (cachedFormattedKey) {
+                return cachedFormattedKey;
+            }
+
             var sessionEncryptionKey = getSessionEncryptionKey();
             var key = CryptoJS.enc.Hex.parse(convertUint8ArrayToHexString(sessionEncryptionKey));
 
@@ -155,7 +160,7 @@
                 throw 'Encryption key error';
             }
 
-            // TODO: precompute key
+            cachedFormattedKey = key;
 
             return key;
         }
@@ -215,8 +220,6 @@
                 const sessionToken = authenticateUserResult.sessionToken;
 
                 setSessionToken(sessionToken);
-
-                // TODO: store signature in cookie
 
                 var getUserResult = await getUser(walletAddress);
 
@@ -310,8 +313,6 @@
         }
 
         function addTask(taskTitle, callback) {
-            // TODO: remove console.log of encryption keys
-
             var data = JSON.stringify({
                 title: taskTitle
             });
@@ -320,7 +321,7 @@
             var iv = generateRandomHexString(16);
             var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse(iv));
             $.post('/api/createtask', {
-                userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
+                userId: getSessionWalletAddress(),
                 encryptionIV: iv,
                 encryptedData: encryptedData
             }, function (result) {
@@ -426,7 +427,7 @@
 
         function getTasks(callback) {
             $.get('/api/gettasks', {
-                userId: getSessionWalletAddress(), // TODO: server side should normalize wallet address (e.g. lowercase wallet address)
+                userId: getSessionWalletAddress(),
             }, function (result) {
                 callback(null, result);
             });
@@ -546,7 +547,6 @@
             $('#save_task_button').click(function () {
                 var taskTitle = $('#task_title_input').val().trim();
                 addTask(taskTitle, function (err, result) {
-                    // TODO: handle err
                     var row = createTaskRow(result.task, false);
 
                     taskMap[result.task.TaskId] = result.task;
@@ -622,19 +622,11 @@
                 });
             }
         });
-
-        // TODO: expand input height to show whole task title
-
-        // TODO: save task on enter
-
-        // TODO: add title, body
-
-        // TODO: when clicking outside the modal, show are you sure you want to discard changes text
     </script>
 
     <div class="container" style="max-width: 600px;">
 
-        <nav class="navbar" aria-label="First navbar example" style="padding-left: 0px;">
+        <nav class="navbar" aria-label="First navbar example" style="padding-left: 0px; padding-right: 0px;">
             <div class="container-fluid" style="padding-left: 0px;">
                 <a class="navbar-brand" href="#" style="font-size: 1.75em;">
                     TodoTasks.xyz
@@ -682,7 +674,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            <input id="task_title_input" type="text" autocomplete="off" class="form-control" />
+                            <input id="task_title_input" maxlength="5000" type="text" autocomplete="off" class="form-control" />
                         </div>
                         <div class="modal-footer">
                             <button id="save_task_button" type="button" class="btn btn-primary"
@@ -702,7 +694,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            <input id="edit_task_title_input" type="text" autocomplete="off" class="form-control" />
+                            <input id="edit_task_title_input" maxlength="5000" type="text" autocomplete="off" class="form-control" />
                         </div>
                         <div class="modal-footer">
                             <button id="edit_save_task_button" type="button" class="btn btn-primary"
@@ -758,7 +750,7 @@
             </p>
 
             <p>
-                To sign in, connect with your Ethereum wallet and sign two messages for
+                To sign in, connect with your Ethereum wallet (e.g. MetaMask) and sign two messages for
                 (1) verifying wallet ownership, and (2) generating encryption keys.
             </p>
 

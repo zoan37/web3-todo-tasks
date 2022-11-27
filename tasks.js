@@ -2,6 +2,10 @@ const uuid = require('uuid');
 
 var Tasks = function (config) {
 
+    const MAX_TASK_DATA_LENGTH = 10000;
+    const MAX_IV_LENGTH = 16;
+    const MAX_USER_ID_LENGTH = 100;
+
     const AWS = config.AWS;
     const dynamoDB = config.dynamoDB;
 
@@ -22,8 +26,6 @@ var Tasks = function (config) {
         return rows
     }
 
-    // TODO: enforce size limit for task
-    // TODO: authenticate user before calling createTask
     function createTask(data, callback) {
         var timestamp = Date.now().toString();
 
@@ -31,6 +33,19 @@ var Tasks = function (config) {
         var taskId = uuid.v4();
         var encryptionIV = data.encryptionIV;
         var encryptedData = data.encryptedData;
+
+        if (userId.length > MAX_USER_ID_LENGTH) {
+            callback('UserId is too large', null);
+            return;
+        }
+        if (encryptionIV.length > MAX_IV_LENGTH) {
+            callback('Encryption IV is too large', null);
+            return;
+        }
+        if (encryptedData.length > MAX_TASK_DATA_LENGTH) {
+            callback('Encrypted data is too large', null);
+            return;
+        }
 
         var params = {
             Item: {
@@ -141,6 +156,11 @@ var Tasks = function (config) {
         var taskId = data.taskId;
         var encryptedData = data.encryptedData;
 
+        if (encryptedData.length > MAX_TASK_DATA_LENGTH) {
+            callback('Encrypted data is too large', null);
+            return;
+        }
+
         var params = {
             TableName: "TodoTasks-Tasks",
             Key: {
@@ -218,7 +238,6 @@ var Tasks = function (config) {
         });
     }
 
-    // TODO: authenticate user before calling getTasks
     async function getTasks(data, callback) {
         var userId = data.userId;
 

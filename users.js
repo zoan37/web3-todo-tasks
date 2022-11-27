@@ -32,8 +32,6 @@ var Tasks = function (config) {
         return uuid.v4().replaceAll('-', '');
     }
     
-    // TODO: enforce size limit for task
-    // TODO: authenticate user before calling createTask
     function createUser(data, callback) {
         var timestamp = Date.now().toString();
 
@@ -74,7 +72,6 @@ var Tasks = function (config) {
         });
     }
 
-    // TODO: authenticate user before calling getTasks
     async function getUser(data, callback) {
         var userId = data.userId;
 
