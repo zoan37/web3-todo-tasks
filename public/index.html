@@ -434,7 +434,7 @@
             });
         }
 
-        function displayCompletedTasksCount() {
+        function refreshCompletedTasksCount() {
             var completedTasksCount = 0;
             for (var taskId in taskMap) {
                 if (taskMap[taskId].IsCompleted) {
@@ -542,7 +542,7 @@
 
                     taskMap[taskId].IsCompleted = taskIsChecked;
 
-                    displayCompletedTasksCount();
+                    refreshCompletedTasksCount();
                 });
             });
 
@@ -561,6 +561,8 @@
                     row.remove();
 
                     delete taskMap[taskId];
+
+                    refreshCompletedTasksCount();
                 });
             });
 
@@ -632,7 +634,7 @@
                     console.log(task);
                 }
 
-                displayCompletedTasksCount();
+                refreshCompletedTasksCount();
 
                 $('#open_tasks_tbody').sortable({
                     update: function (event, ui) {
