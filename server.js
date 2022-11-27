@@ -14,6 +14,8 @@ require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
 const AWS = require("aws-sdk");
+AWS.config.update({ region: 'us-east-2' });
+
 const dynamoDB = new AWS.DynamoDB();
 
 const Users = require('./users.js');
@@ -35,15 +37,15 @@ app.get('/', (req, res) => {
 
 function verifyRequest(req) {
     try {
-        var userId; 
+        var userId;
         if (req.method == 'GET') {
             userId = req.query.userId;
         } else {
             userId = req.body.userId;
         }
-        
+
         var sessionToken = req.cookies.sessionToken;
-    
+
         var decoded = jwt.verify(sessionToken, process.env.SESSION_TOKEN_SECRET_KEY);
 
         if (decoded.userId.toLowerCase() != userId.toLowerCase()) {
