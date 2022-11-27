@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>TodoTasks.xyz</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+    <!-- CSS only -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"
+        integrity="sha512-aVKKRRi/Q/YV+4mjoKBsE4x3H+BkegoM/em46NNlCqNTmUYADjBbeNefNxYV7giUp0VxICtqdrbqU7iVaeZNXA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"
+        integrity="sha512-57oZ/vW8ANMjR/KQ6Be9v/+/h6bq9/l3f0Oc7vn6qMqyhvPd1cvKBRWWpzu0QoneImqr2SkmO4MSqU+RpHom3Q=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- JavaScript Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.1/dist/web3.min.js"
+        integrity="sha256-cdcyjItaOZqsMpqD2GtRBYwB4OBBT8RXfav8ecUYxtg=" crossorigin="anonymous"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/argon2-browser/1.18.0/argon2-bundled.min.js"
+        integrity="sha512-Alrh8vbmKDc5xiq7I/y8LTDwy9nw1nT9S/yR73HMMoWrpX4S1kizNPdWM896c/CDIGILNwAiaih627A94kRhYQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"
+        integrity="sha512-E8QSvWZ0eCLGk4km3hxSsNmGWbLtSCSUcewDQPQWZF6pEU8GlT8a5fF32wOl1i8ftdMhssTrF/OhyGWwonTcXA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/3.0.1/js.cookie.min.js"
+        integrity="sha512-wT7uPE7tOP6w4o28u1DN775jYjHQApdBnib5Pho4RB0Pgd9y7eSkAV1BTqQydupYDB9GBhTcQQzyNMPMV3cAew=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script src="/bundle.js"></script>
+
+    <style>
+        .task_title_cell {
+            width: 100%;
+            padding-left: 10px;
+        }
+
+        .task_strikethrough {
+            text-decoration: line-through;
+        }
+
+        .task_row:hover {
+            background-color: rgb(246, 246, 246);
+        }
+
+        .task_row td {
+            vertical-align: middle;
+            padding-top: 3px;
+            padding-bottom: 3px;
+        }
+
+        .task_checkbox {
+            cursor: pointer;
+        }
+
+        .task_trash_cell {
+            padding-left: 4px;
+            padding-right: 4px;
+            cursor: pointer;
+        }
+
+        #open_tasks_table .task_trash_cell {
+            display: none;
+        }
+
+        #open_tasks_table {
+            width: 100%;
+        }
+
+        #completed_tasks_table {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script>
+        var taskMap = {};
+
+        // https://stackoverflow.com/questions/58325771/how-to-generate-random-hex-string-in-javascript
+        function generateRandomHexString(numBytes) {
+            const bytes = crypto.getRandomValues(new Uint8Array(numBytes));
+            const array = Array.from(bytes);
+            const hexPairs = array.map(b => b.toString(16).padStart(2, '0'));
+            return hexPairs.join('');
+        }
+
+        function encryptMessage(message, key, iv) {
+            var encryptResult = CryptoJS.AES.encrypt(message, key, {
+                iv: iv
+            });
+            return encryptResult.toString();
+        }
+
+        function decryptMessage(message, key, iv) {
+            var decryptResult = CryptoJS.AES.decrypt(message, key, {
+                iv: iv
+            });
+            return decryptResult.toString(CryptoJS.enc.Utf8);
+        }
+
+        function removeSessionToken() {
+            Cookies.remove('session_token');
+        }
+
+        function setSessionToken(sessionToken) {
+            Cookies.set('sessionToken', sessionToken);
+        }
+
+        function setSessionWalletAddress(walletAddress) {
+            localStorage.setItem('walletAddress', walletAddress);
+        }
+
+        function getSessionWalletAddress() {
+            return localStorage.getItem('walletAddress');
+        }
+
+        function setSessionEncryptionKey(encryptionKey) {
+            localStorage.setItem('encryptionKey', encryptionKey.toString());
+
+            // test that encryption key is stored correctly
+            if (!checkUint8ArraysEqual(encryptionKey, getSessionEncryptionKey())) {
+                throw 'Encryption key error';
+            }
+        }
+
+        function getSessionEncryptionKey() {
+            var key = localStorage.getItem('encryptionKey');
+            if (!key) {
+                return null;
+            }
+            return new Uint8Array(key.split(','));
+        }
+
+        var cachedFormattedKey = null;
+        // CryptoJS.AES requires CryptoJS.enc.Hex.parse for custom encryption key
+        function getFormattedSessionEncryptionKey() {
+            if (cachedFormattedKey) {
+                return cachedFormattedKey;
+            }
+
+            var sessionEncryptionKey = getSessionEncryptionKey();
+            var key = CryptoJS.enc.Hex.parse(convertUint8ArrayToHexString(sessionEncryptionKey));
+
+            // sanity check key
+            var calculatedKey = convertHexStringToUint8Array(CryptoJS.enc.Hex.stringify(key));
+            if (!checkUint8ArraysEqual(calculatedKey, sessionEncryptionKey)) {
+                throw 'Encryption key error';
+            }
+
+            cachedFormattedKey = key;
+
+            return key;
+        }
+
+        function isAccountConnected() {
+            return getSessionWalletAddress() && getSessionEncryptionKey();
+        }
+
+        // https://stackoverflow.com/questions/38987784/how-to-convert-a-hexadecimal-string-to-uint8array-and-back-in-javascript
+        const convertHexStringToUint8Array = (hexString) =>
+            Uint8Array.from(hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
+        const convertUint8ArrayToHexString = (bytes) =>
+            bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
+
+        function checkUint8ArraysEqual(array1, array2) {
+            if (!(array1 instanceof Uint8Array) || !(array2 instanceof Uint8Array)) {
+                return false;
+            }
+            if (array1.length !== array2.length) {
+                return false;
+            }
+            for (var i = 0; i < array1.length; i++) {
+                if (array1[i] !== array2[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        async function connect() {
+            if (window.ethereum) {
+                if (isAccountConnected()) {
+                    console.log('already connected');
+                    return;
+                }
+
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+                window.web3 = new Web3(window.ethereum);
+                const account = web3.eth.accounts;
+                const walletAddress = account.givenProvider.selectedAddress;
+                console.log(`Wallet: ${walletAddress}`);
+
+                setSessionWalletAddress(walletAddress);
+
+                var getUserNonceResult = await getUserNonce(walletAddress);
+                if (!getUserNonceResult.AuthenticationNonce) {
+                    var createUserResult = await createUser(walletAddress);
+                    getUserNonceResult = await getUserNonce(walletAddress);
+                }
+
+                const authenticationNonce = getUserNonceResult.AuthenticationNonce;
+
+                const signature = await web3.eth.personal.sign("Verify wallet ownership for TodoTasks.xyz\nNonce: " + authenticationNonce, walletAddress);
+
+                var authenticateUserResult = await authenticateUser(walletAddress, signature);
+
+                const sessionToken = authenticateUserResult.sessionToken;
+
+                setSessionToken(sessionToken);
+
+                var getUserResult = await getUser(walletAddress);
+
+                const encryptionSalt = getUserResult.EncryptionSalt;
+
+                if (!encryptionSalt) {
+                    throw 'Encryption salt not found';
+                }
+
+                var encryptionSignature = await web3.eth.personal.sign("Generate encryption keys\nSalt: " + encryptionSalt, walletAddress);
+
+                // sanity check encryption signature length
+                if (encryptionSignature.length < 10) {
+                    throw 'Encryption signature error';
+                }
+
+                // Use 'default_salt' here since salt is already used in signature
+                var hashResult = await argon2.hash({ pass: encryptionSignature, salt: 'default_salt', hashLen: 32 });
+                var hashHex = hashResult.hashHex;
+                var hash = hashResult.hash;
+
+                // sanity check encryption hash
+                if (!(hash instanceof Uint8Array) || hash.length != 32) {
+                    throw 'Encryption key error';
+                }
+
+                const masterSecret = hash; // Uint8Array of arbitrary length
+                const hashMethod = 'SHA-256';
+                const length = 32; // derived key length
+                const info = ''; // information specified in rfc5869
+                const salt = new Uint8Array([1]); // Uint8Array of arbitrary length
+                // In the future, can use other salt values to derive keys for other purposes
+
+                var derivedKey = await HKDF.compute(masterSecret, hashMethod, length, info, salt);
+
+                const encryptionKey = derivedKey.key;
+
+                // sanity check encryption key
+                if (!(encryptionKey instanceof Uint8Array) || encryptionKey.length != 32) {
+                    throw 'Encryption key error';
+                }
+
+                setSessionEncryptionKey(encryptionKey);
+
+                location.reload();
+            } else {
+                alert('No Ethereum wallet detected');
+                console.log("No wallet");
+            }
+        }
+
+        async function createUser(userId) {
+            return new Promise(resolve => {
+                $.post('/api/createuser', {
+                    userId: userId
+                }, function (result) {
+                    resolve(result);
+                });
+            });
+        }
+
+        async function getUser(userId) {
+            return new Promise(resolve => {
+                $.get('/api/getuser', {
+                    userId: userId
+                }, function (result) {
+                    resolve(result);
+                });
+            });
+        }
+
+        async function getUserNonce(userId) {
+            return new Promise(resolve => {
+                $.get('/api/getusernonce', {
+                    userId: userId
+                }, function (result) {
+                    resolve(result);
+                });
+            });
+        }
+
+        async function authenticateUser(userId, signature) {
+            return new Promise(resolve => {
+                $.post('/api/authenticateuser', {
+                    userId: userId,
+                    signature: signature
+                }, function (result) {
+                    resolve(result);
+                });
+            });
+        }
+
+        function addTask(taskTitle, callback) {
+            var data = JSON.stringify({
+                title: taskTitle
+            });
+
+            var key = getFormattedSessionEncryptionKey();
+            var iv = generateRandomHexString(16);
+            var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse(iv));
+            $.post('/api/createtask', {
+                userId: getSessionWalletAddress(),
+                encryptionIV: iv,
+                encryptedData: encryptedData
+            }, function (result) {
+                callback(null, result);
+            });
+        }
+
+        function updateTaskTitle(taskId, taskTitle, callback) {
+            var data = JSON.stringify({
+                title: taskTitle
+            });
+
+            var key = getFormattedSessionEncryptionKey();
+            var iv = taskMap[taskId].EncryptionIV;
+            var encryptedData = encryptMessage(data, key, CryptoJS.enc.Hex.parse(iv));
+
+            updateTask({
+                taskId: taskId,
+                encryptedData: encryptedData
+            }, callback);
+        }
+
+        function updateTaskCompletion(taskId, isCompleted, callback) {
+            updateTask({
+                taskId: taskId,
+                isCompleted: isCompleted
+            }, callback);
+        }
+
+        function updateTaskOrderForRow(row, callback) {
+            var prevTaskId = row.prev().attr('data-task-id');
+            var currTaskId = row.attr('data-task-id');
+            var nextTaskId = row.next().attr('data-task-id');
+
+            const t = Number(taskMap[currTaskId].Order);
+            var lower = null;
+            var upper = null;
+
+            var newOrder = null;
+
+            if (prevTaskId) {
+                upper = Number(taskMap[prevTaskId].Order);
+            }
+            if (nextTaskId) {
+                lower = Number(taskMap[nextTaskId].Order);
+            }
+
+            if (upper == null && lower == null) {
+                newOrder = t;
+            } else if (upper != null && lower != null) {
+                newOrder = upper / 2.0 + lower / 2.0;
+            } else if (upper != null) {
+                newOrder = upper - 100.0; // 100 for 100 milliseconds
+            } else if (lower != null) {
+                newOrder = lower + 100.0; // 100 for 100 milliseconds
+            }
+
+            taskMap[currTaskId].Order = newOrder;
+
+            updateTaskOrder(currTaskId, newOrder, function (err, result) {
+
+            });
+        }
+
+        function updateTaskOrder(taskId, order, callback) {
+            updateTask({
+                taskId: taskId,
+                order: order
+            }, callback);
+        }
+
+        function updateTask(data, callback) {
+            $.post('/api/updatetask', {
+                userId: getSessionWalletAddress(),
+                taskId: data.taskId,
+                isCompleted: data.isCompleted,
+                encryptedData: data.encryptedData,
+                order: data.order
+            }, function (result) {
+                callback(null, result);
+            });
+        }
+
+        function deleteTask(taskId, callback) {
+            $.post('/api/deletetask', {
+                userId: getSessionWalletAddress(),
+                taskId: taskId
+            }, function (result) {
+                callback(null, result);
+            });
+        }
+
+        function refreshCompletedTasksCount() {
+            var completedTasksCount = 0;
+            for (var taskId in taskMap) {
+                if (taskMap[taskId].IsCompleted) {
+                    completedTasksCount++;
+                }
+            }
+
+            $('#completed_tasks_count').text(completedTasksCount);
+        }
+
+        function getTasks(callback) {
+            $.get('/api/gettasks', {
+                userId: getSessionWalletAddress(),
+            }, function (result) {
+                callback(null, result);
+            });
+        }
+
+        function createTaskRow(task, isCompleted) {
+            var row = $('<tr></tr>');
+
+            var key = getFormattedSessionEncryptionKey();
+            var iv = task.EncryptionIV;
+            var encryptedData = task.EncryptedData;
+            var taskId = task.TaskId;
+
+            var decryptedData = decryptMessage(encryptedData, key, CryptoJS.enc.Hex.parse(iv));
+
+            var data = JSON.parse(decryptedData);
+
+            var checkbox = $('<input class="form-check-input" type="checkbox" value=""/>')
+                .prop('checked', isCompleted)
+                .addClass('task_checkbox')
+                .attr('data-task-id', taskId);
+
+            var cell1 = $('<td></td>').append(checkbox);
+            var cell2 = $('<td></td>').addClass('task_title_cell').text(data.title);
+            cell2.attr('data-task-id', taskId);
+
+            var trash = $(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                    fill="currentColor" style="vertical-align: -.125em;" class="bi bi-trash"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z">
+                    </path>
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z">
+                    </path>
+                </svg>
+            `);
+
+            var cell3 = $('<td></td>')
+                .addClass('task_trash_cell')
+                .attr('data-task-id', taskId)
+                .html(trash);
+
+            row.append(cell1);
+            row.append(cell2);
+            row.append(cell3);
+
+            row.addClass('task_row');
+            row.attr('data-task-id', taskId);
+
+            if (isCompleted) {
+                row.find('.task_title_cell').addClass('task_strikethrough');
+            }
+
+            return row;
+        }
+
+        $(document).ready(function () {
+            $(document).on('change', '.task_checkbox', function () {
+                const taskId = $(this).attr("data-task-id");
+                const taskIsChecked = this.checked;
+                updateTaskCompletion(taskId, taskIsChecked, function (err, result) {
+                    var row;
+                    if (taskIsChecked) {
+                        row = $('.task_row[data-task-id="' + taskId + '"]');
+                        row.remove();
+
+                        row.find('.task_title_cell').addClass('task_strikethrough');
+
+                        $('#completed_tasks_tbody').prepend(row);
+                    } else {
+                        row = $('.task_row[data-task-id="' + taskId + '"]');
+                        row.remove();
+
+                        row.find('.task_title_cell').removeClass('task_strikethrough');
+
+                        $('#open_tasks_tbody').prepend(row);
+                    }
+
+                    updateTaskOrderForRow(row, function (err, result) {
+
+                    });
+
+                    taskMap[taskId].IsCompleted = taskIsChecked;
+
+                    refreshCompletedTasksCount();
+                });
+            });
+
+            $(document).on('click', '.task_title_cell', function () {
+                $('#edit_task_title_input').val($(this).text());
+                var taskId = $(this).attr('data-task-id');
+                $('#edit_task_title_input').attr('data-task-id', taskId);
+                $("#editTaskModal").modal('show');
+            });
+
+            $(document).on('click', '.task_trash_cell', function () {
+                var taskId = $(this).attr('data-task-id');
+
+                deleteTask(taskId, function (err, result) {
+                    var row = $('.task_row[data-task-id="' + taskId + '"]');
+                    row.remove();
+
+                    delete taskMap[taskId];
+
+                    refreshCompletedTasksCount();
+                });
+            });
+
+            $('#sign_out_button').click(function () {
+                removeSessionToken();
+                localStorage.clear();
+                location.reload();
+            });
+
+            $('#save_task_button').click(function () {
+                var taskTitle = $('#task_title_input').val().trim();
+                addTask(taskTitle, function (err, result) {
+                    var row = createTaskRow(result.task, false);
+
+                    taskMap[result.task.TaskId] = result.task;
+
+                    $('#open_tasks_tbody').prepend(row);
+                });
+            });
+
+            $('#task_title_input').keypress(function (e) {
+                if (e.which == 13) {
+                    $('#save_task_button').click();
+                }
+            });
+
+            $('#edit_save_task_button').click(function () {
+                var taskId = $('#edit_task_title_input').attr('data-task-id');
+                var taskTitle = $('#edit_task_title_input').val().trim();
+                updateTaskTitle(taskId, taskTitle, function (err, result) {
+                    $('.task_title_cell[data-task-id="' + taskId + '"]').text(taskTitle);
+                });
+            });
+
+            $('#edit_task_title_input').keypress(function (e) {
+                if (e.which == 13) {
+                    $('#edit_save_task_button').click();
+                }
+            });
+
+            $('#addTaskModal').on('show.bs.modal', function (e) {
+                $('#task_title_input').val('');
+            });
+
+            $('#addTaskModal').on('shown.bs.modal', function (e) {
+                $('#task_title_input').focus();
+            });
+
+            $('#editTaskModal').on('shown.bs.modal', function (e) {
+                $('#edit_task_title_input').focus();
+            });
+
+            if (isAccountConnected()) {
+                getTasks(function (err, result) {
+                    const tasks = result.tasks;
+
+                    tasks.sort(function (a, b) {
+                        return Number(b.Order) - Number(a.Order);
+                    });
+
+                    for (var i = 0; i < tasks.length; i++) {
+                        var task = tasks[i];
+
+                        var isCompleted = task.IsCompleted;
+                        var row = createTaskRow(task, isCompleted);
+
+                        if (isCompleted) {
+                            $('#completed_tasks_tbody').append(row);
+                        } else {
+                            $('#open_tasks_tbody').append(row);
+                        }
+
+                        taskMap[task.TaskId] = task;
+                    }
+
+                    refreshCompletedTasksCount();
+
+                    $('#open_tasks_tbody').sortable({
+                        update: function (event, ui) {
+                            updateTaskOrderForRow(ui.item, function (err, result) {
+
+                            });
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+
+    <div class="container" style="max-width: 600px;">
+
+        <nav class="navbar" aria-label="First navbar example" style="padding-left: 0px; padding-right: 0px;">
+            <div class="container-fluid" style="padding-left: 0px;">
+                <a class="navbar-brand" href="#" style="font-size: 1.75em;">
+                    TodoTasks.xyz
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarsExample01" aria-controls="navbarsExample01" aria-expanded="false"
+                    aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navbarsExample01">
+                    <ul class="navbar-nav me-auto mb-2">
+                        <li class="nav-item signed_out_view">
+                            <a class="nav-link" href="#" onclick="connect();">Connect Wallet</a>
+                        </li>
+                        <li class="nav-item signed_in_view">
+                            <a class="nav-link" href="#" id="sign_out_button">Sign Out</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="https://github.com/zoan37/web3-todo-tasks"
+                                target="_blank">GitHub</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="https://twitter.com/zoan37" target="_blank">Twitter</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="signed_in_view">
+            <p>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                    Add Task
+                </button>
+            </p>
+
+            <!-- Modal -->
+            <div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="exampleModalLabel">Add Task</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input id="task_title_input" maxlength="5000" type="text" autocomplete="off" class="form-control" />
+                        </div>
+                        <div class="modal-footer">
+                            <button id="save_task_button" type="button" class="btn btn-primary"
+                                data-bs-dismiss="modal">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal -->
+            <div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="exampleModalLabel">Edit Task</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input id="edit_task_title_input" maxlength="5000" type="text" autocomplete="off" class="form-control" />
+                        </div>
+                        <div class="modal-footer">
+                            <button id="edit_save_task_button" type="button" class="btn btn-primary"
+                                data-bs-dismiss="modal">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <table id="open_tasks_table">
+                    <tbody id="open_tasks_tbody"></tbody>
+                </table>
+
+                <div class="accordion accordion-flush" id="accordionFlushExample"
+                    style="border-top: 1px solid rgb(216, 216, 216); margin-top: 15px;">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="flush-headingOne">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#flush-collapseOne" aria-expanded="false"
+                                aria-controls="flush-collapseOne" style="">
+                                Completed Tasks (<span id="completed_tasks_count"></span>)
+                            </button>
+                        </h2>
+                        <div id="flush-collapseOne" class="accordion-collapse collapse"
+                            aria-labelledby="flush-headingOne" data-bs-parent="#accordionFlushExample">
+
+                            <table id="completed_tasks_table">
+                                <tbody id="completed_tasks_tbody"></tbody>
+                            </table>
+
+                            <div class="accordion-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="signed_out_view">
+            <p>
+                <button type="button" class="btn btn-primary" onclick="connect();">Connect Wallet</button>
+            </p>
+            <div>
+                <figure class="figure">
+                    <img src="/images/screenshot.png" class="figure-img img-fluid rounded img-thumbnail"
+                        style="max-width: 300px;">
+                    <figcaption class="figure-caption">Screenshot</figcaption>
+                </figure>
+            </div>
+            <p>
+                TodoTasks.xyz is a web3 end-to-end encrypted task manager. It can be used
+                for todos and quick notes. It doesn't work on mobile currently; could eventually make it a progressive web app to support mobile.
+            </p>
+
+            <p>
+                To sign in, connect with your Ethereum wallet (e.g. MetaMask) and sign two messages for
+                (1) verifying wallet ownership, and (2) generating encryption keys.
+            </p>
+
+            <p>
+                All tasks are end-to-end encrypted and stored in AWS.
+            </p>
+
+            <p>
+                TodoTasks.xyz is <a href="https://github.com/zoan37/web3-todo-tasks" target="_blank">open source on
+                    GitHub</a>. Made by <a href="https://twitter.com/zoan37" target="_blank">zoan.eth</a>.
+            </p>
+        </div>
+
+        <script>
+            if (isAccountConnected()) {
+                $('.signed_out_view').hide();
+            } else {
+                $('.signed_in_view').hide();
+            }
+        </script>
+
+    </div>
+
+</body>
+
+</html>
