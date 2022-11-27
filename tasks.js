@@ -21,7 +21,7 @@ var Tasks = function (config) {
         } while (lastEvaluatedKey)
         return rows
     }
-    
+
     // TODO: enforce size limit for task
     // TODO: authenticate user before calling createTask
     function createTask(data, callback) {
@@ -39,6 +39,9 @@ var Tasks = function (config) {
                 },
                 "TaskId": {
                     S: taskId
+                },
+                "ListId": {
+                    S: 'default' // hardcoded for now
                 },
                 "EncryptionIV": {
                     S: encryptionIV
@@ -266,10 +269,37 @@ var Tasks = function (config) {
         callback(null, result);
     }
 
+    function deleteTask(data, callback) {
+        var userId = data.userId;
+        var taskId = data.taskId;
+
+        var params = {
+            Key: {
+                "UserId": {
+                    S: userId
+                },
+                "TaskId": {
+                    S: taskId
+                },
+            },
+            TableName: "TodoTasks-Tasks"
+        };
+
+        dynamoDB.deleteItem(params, function (err, data) {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+
+            callback(null, data);
+        });
+    }
+
     return {
         createTask: createTask,
         getTasks: getTasks,
-        updateTask: updateTask
+        updateTask: updateTask,
+        deleteTask: deleteTask
     }
 };
 

@@ -60,6 +60,20 @@
             padding-bottom: 3px;
         }
 
+        .task_checkbox {
+            cursor: pointer;
+        }
+
+        .task_trash_cell {
+            padding-left: 4px;
+            padding-right: 4px;
+            cursor: pointer;
+        }
+
+        #open_tasks_table .task_trash_cell {
+            display: none;
+        }
+
         #open_tasks_table {
             width: 100%;
         }
@@ -73,8 +87,6 @@
 <body>
 
     <script>
-        var sessionEncryptionKey = null;
-
         var taskMap = {};
 
         // https://stackoverflow.com/questions/58325771/how-to-generate-random-hex-string-in-javascript
@@ -135,7 +147,13 @@
                 throw 'Encryption key error';
             }
 
+            // TODO: precompute key
+
             return key;
+        }
+
+        function isAccountConnected() {
+            return getSessionWalletAddress() && getSessionEncryptionKey();
         }
 
         // https://stackoverflow.com/questions/38987784/how-to-convert-a-hexadecimal-string-to-uint8array-and-back-in-javascript
@@ -161,42 +179,30 @@
 
         async function connect() {
             if (window.ethereum) {
-                if (getSessionWalletAddress() && getSessionEncryptionKey()) {
-                    alert('already connected');
-                    // return;
+                if (isAccountConnected()) {
+                    console.log('already connected');
+                    return;
                 }
 
                 await window.ethereum.request({ method: "eth_requestAccounts" });
                 window.web3 = new Web3(window.ethereum);
                 const account = web3.eth.accounts;
-                //Get the current MetaMask selected/active wallet
                 const walletAddress = account.givenProvider.selectedAddress;
                 console.log(`Wallet: ${walletAddress}`);
 
                 setSessionWalletAddress(walletAddress);
 
-                // TODO: normalize wallet address (e.g. lowercase wallet address)
-
                 var getUserNonceResult = await getUserNonce(walletAddress);
-                console.log('getUserNonceResult:');
-                console.log(getUserNonceResult);
-
                 if (!getUserNonceResult.AuthenticationNonce) {
                     var createUserResult = await createUser(walletAddress);
-                    console.log('createUserResult:');
-                    console.log(createUserResult);
-
                     getUserNonceResult = await getUserNonce(walletAddress);
                 }
 
                 const authenticationNonce = getUserNonceResult.AuthenticationNonce;
 
                 const signature = await web3.eth.personal.sign("Verify wallet ownership for TodoTasks.xyz\nNonce: " + authenticationNonce, walletAddress);
-                console.log('Signature: ' + signature);
 
                 var authenticateUserResult = await authenticateUser(walletAddress, signature);
-                console.log('authenticateUserResult:');
-                console.log(authenticateUserResult);
 
                 const sessionToken = authenticateUserResult.sessionToken;
 
@@ -205,8 +211,6 @@
                 // TODO: store signature in cookie
 
                 var getUserResult = await getUser(walletAddress);
-                console.log('getUserResult:');
-                console.log(getUserResult);
 
                 const encryptionSalt = getUserResult.EncryptionSalt;
 
@@ -215,19 +219,16 @@
                 }
 
                 var encryptionSignature = await web3.eth.personal.sign("Generate encryption keys\nSalt: " + encryptionSalt, walletAddress);
-                console.log('encryptionSignature: ' + encryptionSignature);
 
                 // sanity check encryption signature length
                 if (encryptionSignature.length < 10) {
                     throw 'Encryption signature error';
                 }
 
-                // TODO: get salt from database
+                // Use 'default_salt' here since salt is already used in signature
                 var hashResult = await argon2.hash({ pass: encryptionSignature, salt: 'default_salt', hashLen: 32 });
                 var hashHex = hashResult.hashHex;
                 var hash = hashResult.hash;
-                console.log(hashResult);
-                console.log(hashHex);
 
                 // sanity check encryption hash
                 if (!(hash instanceof Uint8Array) || hash.length != 32) {
@@ -242,8 +243,6 @@
                 // In the future, can use other salt values to derive keys for other purposes
 
                 var derivedKey = await HKDF.compute(masterSecret, hashMethod, length, info, salt);
-                console.log('derivedKey:');
-                console.log(derivedKey);
 
                 const encryptionKey = derivedKey.key;
 
@@ -252,40 +251,7 @@
                     throw 'Encryption key error';
                 }
 
-                console.log('encryptionKey');
-                console.log(encryptionKey);
-
                 setSessionEncryptionKey(encryptionKey);
-
-                console.log('encryptionKey to string');
-                console.log(encryptionKey.toString());
-
-                console.log('encryptionKey to string back to array');
-                console.log(new Uint8Array(encryptionKey.toString().split(',')));
-
-                console.log('getSessionEncryptionKey()');
-                console.log(getSessionEncryptionKey());
-
-                // TODO: iv should be stored in message and generated randomly
-                // IV size should be 16 bytes (128 bits)
-                var iv = CryptoJS.enc.Hex.parse(generateRandomHexString(16));
-                console.log('iv');
-                console.log(iv);
-
-                // Encrypt
-                var encryptResult = CryptoJS.AES.encrypt('my message', encryptionKey, {
-                    iv: iv
-                });
-                var ciphertext = encryptResult.toString();
-                console.log('encryptResult: ');
-                console.log(encryptResult);
-                console.log('ciphertext: ' + ciphertext);
-
-                var decryptedText = CryptoJS.AES.decrypt(ciphertext, encryptionKey, {
-                    iv: iv
-                }).toString(CryptoJS.enc.Utf8);
-
-                console.log('decryptedText: ' + decryptedText);
             } else {
                 alert('No Ethereum wallet detected');
                 console.log("No wallet");
@@ -457,6 +423,17 @@
             });
         }
 
+        function deleteTask(taskId, callback) {
+            $.post('/api/deletetask', {
+                userId: getSessionWalletAddress(),
+                taskId: taskId
+            }, function (result) {
+                console.log(result);
+
+                callback(null, result);
+            });
+        }
+
         function displayCompletedTasksCount() {
             var completedTasksCount = 0;
             for (var taskId in taskMap) {
@@ -503,7 +480,23 @@
             var cell2 = $('<td></td>').addClass('task_title_cell').text(data.title);
             cell2.attr('data-task-id', taskId);
 
-            var cell3 = $('<td></td>').text(task.Order);
+            var trash = $(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                    fill="currentColor" style="vertical-align: -.125em;" class="bi bi-trash"
+                    viewBox="0 0 16 16">
+                    <path
+                        d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z">
+                    </path>
+                    <path fill-rule="evenodd"
+                        d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z">
+                    </path>
+                </svg>
+            `);
+
+            var cell3 = $('<td></td>')
+                .addClass('task_trash_cell')
+                .attr('data-task-id', taskId)
+                .html(trash);
 
             row.append(cell1);
             row.append(cell2);
@@ -558,6 +551,17 @@
                 var taskId = $(this).attr('data-task-id');
                 $('#edit_task_title_input').attr('data-task-id', taskId);
                 $("#editTaskModal").modal('show');
+            });
+
+            $(document).on('click', '.task_trash_cell', function () {
+                var taskId = $(this).attr('data-task-id');
+
+                deleteTask(taskId, function (err, result) {
+                    var row = $('.task_row[data-task-id="' + taskId + '"]');
+                    row.remove();
+
+                    delete taskMap[taskId];
+                });
             });
 
             $('#save_task_button').click(function () {

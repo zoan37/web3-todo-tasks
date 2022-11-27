@@ -181,6 +181,28 @@ app.post('/api/updatetask', async (req, res) => {
     });
 });
 
+app.post('/api/deletetask', async (req, res) => {
+    console.log(req.body);
+
+    if (!verifyRequest(req)) {
+        res.status(401).send("Unauthorized");
+        return;
+    }
+
+    tasks.deleteTask({
+        userId: req.body.userId.toLowerCase(),
+        taskId: req.body.taskId
+    }, function (err, result) {
+        if (err) {
+            console.log(err);
+            return;
+        }
+
+        console.log(result);
+        res.send(result);
+    });
+});
+
 app.get('/api/gettasks', async (req, res) => {
     console.log(req.query);
 
