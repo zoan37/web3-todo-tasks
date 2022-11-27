@@ -61,11 +61,6 @@ function verifyRequest(req) {
 app.post('/api/createuser', async (req, res) => {
     console.log(req.body);
 
-    if (!verifyRequest(req)) {
-        res.status(401).send("Unauthorized");
-        return;
-    }
-
     users.createUser({
         userId: req.body.userId.toLowerCase()
     }, function (err, result) {
