@@ -31,10 +31,6 @@ const tasks = new Tasks({
     dynamoDB: dynamoDB
 });
 
-app.get('/', (req, res) => {
-    res.send('Hello World!')
-})
-
 function verifyRequest(req) {
     try {
         var userId;
